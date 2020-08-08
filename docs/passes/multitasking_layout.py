@@ -50,15 +50,15 @@ def _compose_multicircuits(circuit_config_tuple: Tuple[List[QuantumCircuit], Dic
 
     composed_multicircuit = QuantumCircuit(name=output_name)
     qubit_counter = 0
+    name_list = ['q']
     for circuit in circuits:
         circuit.remove_final_measurements()
         register_size = circuit.num_qubits
-        register_name = None
+        register_name = circuit.qubits[0].register.name if circuit.qubits[0].register.name not in name_list else None
+        name_list.append(register_name)
         """FIXME!
         量子回路の名前が同一だと、エラーを吐くので、
-        同一の場合のexecptionを作る
-
-            register_name = circuit.qubits[0].register.name    
+        同一の場合のexecptionを作る    
         """
         qr = QuantumRegister(size=register_size, name=register_name)
         # add register and combine circuit
@@ -72,7 +72,6 @@ def _compose_multicircuits(circuit_config_tuple: Tuple[List[QuantumCircuit], Dic
         composed_multicircuit.measure(qr, cr)
 
         qubit_counter += register_size
-
     return composed_multicircuit
 
 
