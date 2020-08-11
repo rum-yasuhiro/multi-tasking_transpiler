@@ -3,17 +3,17 @@ from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
 from qiskit.tools.parallel import parallel_map
 
 
-def multitasking_layout(multi_circuits: Union[QuantumCircuit, List[QuantumCircuit]],
-                        backend=None,
-                        backend_properties=None,
-                        output_names=None,
-                        ):
+def multitasking_compose(multi_circuits: Union[QuantumCircuit, List[QuantumCircuit]],
+                         backend=None,
+                         backend_properties=None,
+                         output_names=None,
+                         ) -> Union[QuantumCircuit, List[QuantumCircuit]:
     """Mapping several circuits to single circuit based on calibration for the backend
 
     Args:
         multi_circuits: Small circuits to compose one big circuit(s)
-        backend: 
-        backend_properties: 
+        backend:
+        backend_properties:
         output_names: the name of output circuit. str or List[str]
 
     Returns:
@@ -36,21 +36,21 @@ def multitasking_layout(multi_circuits: Union[QuantumCircuit, List[QuantumCircui
 
 
 def _compose_multicircuits(circuit_config_tuple: Tuple[List[QuantumCircuit], Dict]) -> QuantumCircuit:
-    circuits, combine_args = circuit_config_tuple
+    circuits, combine_args= circuit_config_tuple
 
     # num_qubit = combine_args['num_qubit']
-    output_name = combine_args['output_name']
+    output_name= combine_args['output_name']
 
     """FIXME!
     入力の量子回路の量子ビット数合計がbackendの量子ビット数を超える場合のErrorを作る
-    
+
         if sum([circuit.num_qubit for circuit in circuits]) > num_qubit:
             raise
     """
 
-    composed_multicircuit = QuantumCircuit(name=output_name)
-    qubit_counter = 0
-    name_list = ['q']
+    composed_multicircuit= QuantumCircuit(name=output_name)
+    qubit_counter= 0
+    name_list= ['q']
     for circuit in circuits:
         circuit.remove_final_measurements()
         register_size = circuit.num_qubits
@@ -58,7 +58,7 @@ def _compose_multicircuits(circuit_config_tuple: Tuple[List[QuantumCircuit], Dic
         name_list.append(register_name)
         """FIXME!
         量子回路の名前が同一だと、エラーを吐くので、
-        同一の場合のexecptionを作る    
+        同一の場合のexecptionを作る
         """
         qr = QuantumRegister(size=register_size, name=register_name)
         # add register and combine circuit
@@ -92,7 +92,7 @@ def _parse_combine_args(multi_circuits, backend, backend_propaerties, output_nam
         """これから増やす
             'coupling_map': args[?],
             'initial_layout': args[?],
-        ... 
+        ...
         """
         combine_args.append(arg_dict)
 

@@ -1,6 +1,6 @@
 from qiskit.circuit.random import random_circuit
 from qiskit import QuantumCircuit, IBMQ
-from docs.passes.multitasking_layout import multitasking_layout, _parse_combine_args, _parse_backend_properties, _compose_multicircuits
+from docs.passes.multi_tasking import multitasking_compose, _parse_combine_args, _parse_backend_properties, _compose_multicircuits
 
 
 def test_parse_backend_properties():
@@ -57,7 +57,7 @@ def test_simple_multicircuits():
     backend = provider.backends.ibmq_toronto
 
     # combine circuits
-    multi_programming_circuit = multitasking_layout(
+    multi_programming_circuit = multitasking_compose(
         multi_circuits=circuits, backend=backend, output_names="test1")
 
     return multi_programming_circuit
