@@ -11,6 +11,7 @@ class CrosstalkAdaptiveMultiLayout(AnalysisPass):
         super().__init__()
         self.backend_prop = backend_prop
         self.crosstalk_prop = crosstalk_prop
+        self.crosstalk_edges = []
         self.prog_graphs = []
 
         self.swap_graph = nx.DiGraph()
@@ -92,6 +93,10 @@ class CrosstalkAdaptiveMultiLayout(AnalysisPass):
                         cx_error = (1 - self.cx_reliability[xtalk_edge])
                         cx_error *= self.crosstalk_prop[edge][xtalk_edge]
                         self.cx_reliability[xtalk_edge] = 1 - cx_error
+                    self.crosstalk_edges.append(edge)
+            for edge in self.crosstalk_edges:
+                if edge in self.crosstalk_prop:
+                    self.crosstalk_prop.pop(edge)
             self._update_edge_prop()
 
     def _create_program_graphs(self, dag_list):
@@ -154,6 +159,8 @@ class CrosstalkAdaptiveMultiLayout(AnalysisPass):
                 candidates.append(gate)
         best_reliab = 0
         best_item = None
+        # update gate_reliability with considering about xtalk
+        self._crosstalk_backend_prop()
         for item in candidates:
             if self.gate_reliability[item] > best_reliab:
                 best_reliab = self.gate_reliability[item]
@@ -194,8 +201,8 @@ class CrosstalkAdaptiveMultiLayout(AnalysisPass):
             """
             self.pending_program_edges = sorted(self.prog_graph.edges(data=True),
                                                 key=lambda x: [
-                                                    x[2]['weight'], -x[0], -x[1]],
-                                                reverse=True)
+                x[2]['weight'], -x[0], -x[1]],
+                reverse=True)
 
             while self.pending_program_edges:
                 edge = self._select_next_edge()

@@ -48,7 +48,7 @@ def test_initialize_backend_prop():
     caml._initialize_backend_prop()
 
 
-"""
+"""""""""""""""""""""""""""
 def test_crosstalk_backend_prop():
 
     circ_list = [random_circuit(2, 2) for _ in range(10)]
@@ -69,12 +69,13 @@ def test_crosstalk_backend_prop():
     bprop = BackendProperties(last_update_date=calib_time, backend_name="test_backend",
                               qubits=qubit_list, backend_version="1.0.0", gates=gate_list,
                               general=[])
-    xtalk_prop = {(0, 1): {(1, 2): 3}}
+    xtalk_prop = {(0, 1): {(1, 2): 3}, (3, 4): {(2, 3): 3}}
     caml = CrosstalkAdaptiveMultiLayout(bprop, crosstalk_prop=xtalk_prop)
     caml._initialize_backend_prop()
-    gate_reliab = caml._crosstalk_backend_prop()
+    gate_reliab, crosstalk = caml._crosstalk_backend_prop()
     pprint(gate_reliab)
-"""
+    pprint(crosstalk)
+"""""""""""""""""""""""""""""""""
 
 
 def test_create_program_graphs():
