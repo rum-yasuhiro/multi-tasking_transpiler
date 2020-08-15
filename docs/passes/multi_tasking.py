@@ -7,7 +7,7 @@ def multitasking_compose(multi_circuits: Union[QuantumCircuit, List[QuantumCircu
                          backend=None,
                          backend_properties=None,
                          output_names=None,
-                         ) -> Union[QuantumCircuit, List[QuantumCircuit]:
+                         ) -> Union[QuantumCircuit, List[QuantumCircuit]]:
     """Mapping several circuits to single circuit based on calibration for the backend
 
     Args:
@@ -36,10 +36,10 @@ def multitasking_compose(multi_circuits: Union[QuantumCircuit, List[QuantumCircu
 
 
 def _compose_multicircuits(circuit_config_tuple: Tuple[List[QuantumCircuit], Dict]) -> QuantumCircuit:
-    circuits, combine_args= circuit_config_tuple
+    circuits, combine_args = circuit_config_tuple
 
     # num_qubit = combine_args['num_qubit']
-    output_name= combine_args['output_name']
+    output_name = combine_args['output_name']
 
     """FIXME!
     入力の量子回路の量子ビット数合計がbackendの量子ビット数を超える場合のErrorを作る
@@ -48,13 +48,14 @@ def _compose_multicircuits(circuit_config_tuple: Tuple[List[QuantumCircuit], Dic
             raise
     """
 
-    composed_multicircuit= QuantumCircuit(name=output_name)
-    qubit_counter= 0
-    name_list= ['q']
+    composed_multicircuit = QuantumCircuit(name=output_name)
+    qubit_counter = 0
     for circuit in circuits:
+        print("label = ", label)
         circuit.remove_final_measurements()
         register_size = circuit.num_qubits
-        register_name = circuit.qubits[0].register.name if circuit.qubits[0].register.name not in name_list else None
+        register_name = circuit.qubits[0].register.name if circuit.qubits[
+            0].register.name not in name_list else None
         name_list.append(register_name)
         """FIXME!
         量子回路の名前が同一だと、エラーを吐くので、
