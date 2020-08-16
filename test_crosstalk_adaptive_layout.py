@@ -111,8 +111,8 @@ def test_create_program_graphs():
 
 def test_compose_dag():
 
-    circ_list = [random_circuit(2, 2), random_circuit(
-        4, 4), random_circuit(3, 3), random_circuit(5, 5)]
+    circ_list = [random_circuit(2, 2, measure=True), random_circuit(
+        4, 4, measure=True), random_circuit(3, 3, measure=True), random_circuit(5, 5, measure=True)]
     dag_list = [circuit_to_dag(circ) for circ in circ_list]
 
     calib_time = datetime(year=2019, month=2, day=1,
@@ -141,10 +141,8 @@ def test_compose_dag():
 
 def test_run():
 
-    # circ_list = [random_circuit(2, 2), random_circuit(
-    #     4, 4), random_circuit(3, 3), random_circuit(5, 5)]
-    circ = QuantumCircuit()
-    circ_list = []
+    circ_list = [random_circuit(2, 2), random_circuit(
+        4, 4), random_circuit(3, 3), random_circuit(5, 5)]
     dag_list = [circuit_to_dag(circ) for circ in circ_list]
 
     calib_time = datetime(year=2019, month=2, day=1,

@@ -50,30 +50,35 @@ def _compose_multicircuits(circuit_config_tuple: Tuple[List[QuantumCircuit], Dic
 
     composed_multicircuit = QuantumCircuit(name=output_name)
     name_list = []
-    qubit_counter = 0
+    bit_counter = 0
     for circuit in circuits:
-        print("label = ", label)
-        circuit.remove_final_measurements()
         register_size = circuit.num_qubits
+
+        """FIXME!
+        # register_name: register nameを定義すると、outputの `new_dag` に対して `dag_to_circuit()`
+        # を実行した時、
+        # qiskit.circuit.exceptions.CircuitError: 'register name "定義した名前" already exists'
+        # が発生するため、任意のレジスター名をつけることができない
+        
+        reg_name_tmp = circuit.qubits[0].register.name
         register_name = circuit.qubits[0].register.name if circuit.qubits[
             0].register.name not in name_list else None
         name_list.append(register_name)
-        """FIXME!
-        量子回路の名前が同一だと、エラーを吐くので、
-        同一の場合のexecptionを作る
         """
-        qr = QuantumRegister(size=register_size, name=register_name)
-        # add register and combine circuit
-        composed_multicircuit.add_register(qr)
-        qubits = composed_multicircuit.qubits[qubit_counter:qubit_counter+register_size]
-        composed_multicircuit = composed_multicircuit.compose(
-            circuit, qubits=qubits)
-        # add classical bits and measurement
-        cr = ClassicalRegister(size=register_size, name=register_name)
-        composed_multicircuit.add_register(cr)
-        composed_multicircuit.measure(qr, cr)
+        # 上記FIXME部分はNoneで対応中: 2020 / 08 / 16
+        register_name = None
+        ########################
 
-        qubit_counter += register_size
+        qr = QuantumRegister(size=register_size, name=register_name)
+        cr = ClassicalRegister(size=register_size, name=register_name)
+        composed_multicircuit.add_register(qr)
+        composed_multicircuit.add_register(cr)
+        qubits = composed_multicircuit.qubits[bit_counter:bit_counter+register_size]
+        clbits = composed_multicircuit.clbits[bit_counter:bit_counter+register_size]
+        composed_multicircuit = composed_multicircuit.compose(
+            circuit, qubits=qubits, clbits=clbits)
+
+        bit_counter += register_size
     return composed_multicircuit
 
 

@@ -65,6 +65,6 @@ def test_simple_multicircuits():
 
 if __name__ == "__main__":
 
-    circuits = test_simple_multicircuits()
+    circuits = test_compose_multicircuits()
     print(circuits)
     print(circuits.name)

@@ -1,13 +1,16 @@
 import math
 import networkx as nx
 from qiskit.transpiler.layout import Layout
-from qiskit.transpiler.basepasses import AnalysisPass
+# from qiskit.transpiler.basepasses import AnalysisPass
+#################################################
+from qiskit.transpiler.basepasses import BasePass
+#################################################
 from qiskit.transpiler.exceptions import TranspilerError
 from qiskit import QuantumRegister, ClassicalRegister
 from qiskit.dagcircuit import DAGCircuit
 
 
-class CrosstalkAdaptiveMultiLayout(AnalysisPass):
+class CrosstalkAdaptiveMultiLayout(BasePass):
     def __init__(self, backend_prop, crosstalk_prop=None, output_name=None):
 
         super().__init__()
@@ -200,31 +203,36 @@ class CrosstalkAdaptiveMultiLayout(AnalysisPass):
         """Compose each dag and return new multitask dag"""
 
         name_list = []
-        qubit_counter = 0
+        bit_counter = 0
         for i, dag in enumerate(dag_list):
-            # dag.remove_final_measurements()
             register_size = dag.num_qubits()
-            reg_name_tmp = dag.qubits[0].register.name
-            register_name = reg_name_tmp if (reg_name_tmp not in name_list) and (
-                not reg_name_tmp == 'q') else None
-            name_list.append(register_name)
-            qr = QuantumRegister(size=register_size, name=register_name)
-            self.composed_multidag.add_qreg(qr)
-            qubits = self.composed_multidag.qubits[qubit_counter:qubit_counter+register_size]
-            #################################################################
-            cr = ClassicalRegister(size=register_size, name=register_name)
-            self.composed_multidag.add_creg(cr)
-            clbits = self.composed_multidag.clbits[qubit_counter:qubit_counter+register_size]
-            # composed_multidag = composed_multidag.compose(
-            # dag, qubits=qubits, clbits=clbits)
-            #################################################################
-            self.composed_multidag = self.composed_multidag.compose(
-                dag, qubits=qubits, inplace=False)
-            # cr = ClassicalRegister(size=register_size, name=register_name)
-            # composed_multidag.add_register(cr)
-            # composed_multidag.measure(qr, cr)
+            """FIXME!
+            Problem:
+                register_name: register nameを定義すると、outputの `new_dag` に対して `dag_to_circuit()`
+                を実行した時、
+                qiskit.circuit.exceptions.CircuitError: 'register name "定義した名前" already exists'
+                が発生するため、任意のレジスター名をつけることができない
+            
+            Code: 
+                reg_name_tmp = dag.qubits[0].register.name
+                register_name = reg_name_tmp if (reg_name_tmp not in name_list) and (
+                    not reg_name_tmp == 'q') else None
+            """
+            # 上記FIXME部分はNoneで対応中: 2020 / 08 / 16
+            register_name = None
+            ########################
 
-            qubit_counter += register_size
+            name_list.append(register_name)
+
+            qr = QuantumRegister(size=register_size, name=register_name)
+            cr = ClassicalRegister(size=register_size, name=register_name)
+            self.composed_multidag.add_qreg(qr)
+            self.composed_multidag.add_creg(cr)
+            qubits = self.composed_multidag.qubits[bit_counter:bit_counter+register_size]
+            clbits = self.composed_multidag.clbits[bit_counter:bit_counter+register_size]
+            self.composed_multidag.compose(dag, qubits=qubits, clbits=clbits)
+
+            bit_counter += register_size
         return self.composed_multidag
 
     def run(self, dag_list):
@@ -234,7 +242,7 @@ class CrosstalkAdaptiveMultiLayout(AnalysisPass):
         if num_qubits > len(self.swap_graph):
             raise TranspilerError('Number of qubits greater than device.')
 
-        # layout = Layout()
+        layout = Layout()
         for prog_graph, dag in zip(self.prog_graphs, self.dag_list):
             # sort by weight, then edge name for determinism (since networkx on python 3.5 returns
             # different order of edges)
@@ -282,11 +290,11 @@ class CrosstalkAdaptiveMultiLayout(AnalysisPass):
                 if qid not in self.prog2hw:
                     self.prog2hw[qid] = self.available_hw_qubits[0]
                     self.available_hw_qubits.remove(self.prog2hw[qid])
-            layout = Layout()
-            for q in dag.qubits:
-                pid = self._qarg_to_id(q)
-                hwid = self.prog2hw[pid]
-                layout[q] = hwid
+
+        for q in dag.qubits:
+            pid = self._qarg_to_id(q)
+            hwid = self.prog2hw[pid]
+            layout[q] = hwid
         self.property_set['layout'] = layout
 
         return self.dag_list
