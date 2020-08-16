@@ -112,11 +112,11 @@ class CrosstalkAdaptiveMultiLayout(BasePass):
         prog_kqs = {}
         dags = {}
         for i, dag in enumerate(dag_list):
-            dag_q_id = 0
+            num_q = 0
             for q in dag.qubits:
-                self.qarg_to_id[q.register.name + str(q.index)] = dag_q_id
-                dag_q_id += 1
-            idx += dag_q_id
+                self.qarg_to_id[q.register.name + str(q.index)] = num_q
+                num_q += 1
+            idx += num_q
             _prog_graph = nx.Graph()
             prog_depth = 0
             for gate in dag.two_qubit_ops():
@@ -130,22 +130,22 @@ class CrosstalkAdaptiveMultiLayout(BasePass):
                 _prog_graph.add_edge(min_q, max_q, weight=edge_weight)
                 prog_depth += edge_weight
             # calculate KQ of dag (height * depth)
-            dag_kq = dag_q_id * prog_depth
-            prog_kqs[i] = dag_kq
+            kq = num_q * prog_depth
+            prog_kqs[i] = kq
             dags[i] = dag
-
-        self.dag_list = [dags[dag_kq[0]] for dag_kq in sorted(
+        self.dag_list = [dags[id_kq[0]] for id_kq in sorted(
             prog_kqs.items(), key=lambda x: x[1], reverse=True)]
 
         """FIXME
         # self.prog_graphs = [prog_graphs[dag_kq[0]] for dag_kq in sorted(
         #     prog_kqs.items(), key=lambda x: x[1], reverse=True)]
         """
-        ###############
-        depths = []
-        ###############
         reg_counter = 0
+        # idx = 0
         for dag in self.dag_list:
+            # for q in dag.qubits:
+            #     self.qarg_to_id[q.register.name + str(q.index)] = num_q
+            #     idx += 1
             prog_graph = nx.Graph()
             for gate in dag.two_qubit_ops():
                 qid1 = self._qarg_to_id(gate.qargs[0])+reg_counter
@@ -156,12 +156,9 @@ class CrosstalkAdaptiveMultiLayout(BasePass):
                 if prog_graph.has_edge(min_q, max_q):
                     edge_weight = prog_graph[min_q][max_q]['weight'] + 1
                 prog_graph.add_edge(min_q, max_q, weight=edge_weight)
-            #######################
-            depths.append(edge_weight)
-            #######################
             self.prog_graphs.append(prog_graph)
             reg_counter += dag.num_qubits()
-        return idx, depths
+        return idx
 
     def _qarg_to_id(self, qubit):
         """Convert qarg with name and value to an integer id."""
@@ -268,6 +265,9 @@ class CrosstalkAdaptiveMultiLayout(BasePass):
         for hwid, q in enumerate(new_dag.qubits):
             self.qarg_to_id[q.register.name + str(q.index)] = hwid
 
+        ######################
+        num_prog = 0
+        ######################
         for prog_graph in self.prog_graphs:
             # sort by weight, then edge name for determinism (since networkx on python 3.5 returns
             # different order of edges)
@@ -279,7 +279,17 @@ class CrosstalkAdaptiveMultiLayout(BasePass):
                 x[2]['weight'], -x[0], -x[1]],
                 reverse=True)
 
+            #####################################
+            print(self.pending_program_edges)
+            #####################################
+
             while self.pending_program_edges:
+
+                #######################
+                print(num_prog)
+                print(self.prog2hw)
+                #######################
+
                 edge = self._select_next_edge()
                 q1_mapped = edge[0] in self.prog2hw
                 q2_mapped = edge[1] in self.prog2hw
@@ -290,6 +300,12 @@ class CrosstalkAdaptiveMultiLayout(BasePass):
                                               "in selected device.".format(edge[0], edge[1]))
                     self.prog2hw[edge[0]] = best_hw_edge[0]
                     self.prog2hw[edge[1]] = best_hw_edge[1]
+
+                    #######################
+                    print(num_prog)
+                    print(self.prog2hw)
+                    #######################
+
                     self.available_hw_qubits.remove(best_hw_edge[0])
                     self.available_hw_qubits.remove(best_hw_edge[1])
                 elif not q1_mapped:
@@ -300,6 +316,12 @@ class CrosstalkAdaptiveMultiLayout(BasePass):
                             "CNOT({}, {}) could not be placed in selected device. "
                             "No qubit near qr[{}] available".format(edge[0], edge[1], edge[0]))
                     self.prog2hw[edge[0]] = best_hw_qubit
+
+                    #######################
+                    print(num_prog)
+                    print(self.prog2hw)
+                    #######################
+
                     self.available_hw_qubits.remove(best_hw_qubit)
                 else:
                     best_hw_qubit = self._select_best_remaining_qubit(
@@ -309,14 +331,30 @@ class CrosstalkAdaptiveMultiLayout(BasePass):
                             "CNOT({}, {}) could not be placed in selected device. "
                             "No qubit near qr[{}] available".format(edge[0], edge[1], edge[1]))
                     self.prog2hw[edge[1]] = best_hw_qubit
+
+                    #######################
+                    print(num_prog)
+                    print(self.prog2hw)
+                    #######################
+
                     self.available_hw_qubits.remove(best_hw_qubit)
                 new_edges = [x for x in self.pending_program_edges
                              if not (x[0] in self.prog2hw and x[1] in self.prog2hw)]
+
+                ###########################
+                print(new_edges)
+                ###########################
+
                 self.pending_program_edges = new_edges
-            for qid in self.qarg_to_id.values():
-                if qid not in self.prog2hw:
-                    self.prog2hw[qid] = self.available_hw_qubits[0]
-                    self.available_hw_qubits.remove(self.prog2hw[qid])
+
+            ##################
+            num_prog += 1
+            ##################
+
+        for qid in self.qarg_to_id.values():
+            if qid not in self.prog2hw:
+                self.prog2hw[qid] = self.available_hw_qubits[0]
+                self.available_hw_qubits.remove(self.prog2hw[qid])
 
         for q in new_dag.qubits:
             pid = self._qarg_to_id(q)

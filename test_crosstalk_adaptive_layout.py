@@ -100,18 +100,13 @@ def test_create_program_graphs():
     dag_list = [circuit_to_dag(circ) for circ in circ_list]
 
     caml = CrosstalkAdaptiveMultiLayout(bprop)
-    num_q, depths = caml._create_program_graphs(dag_list)
+    num_q = caml._create_program_graphs(dag_list)
     print(num_q)
     heights = []
-    kqs = []
-    for dag, depth in zip(caml.dag_list, depths):
+    for dag in caml.dag_list:
         height = dag.num_qubits()
-        kq = height * depth
         heights.append(height)
-        kqs.append(kq)
     print(heights)
-    print(depths)
-    print(kqs)
 
 
 def test_compose_dag():
@@ -131,8 +126,12 @@ def test_compose_dag():
                               qubits=qubit_list, backend_version="1.0.0", gates=gate_list,
                               general=[])
 
-    circ_list = [random_circuit(2, 2, measure=True), random_circuit(
-        4, 4, measure=True), random_circuit(3, 3, measure=True), random_circuit(5, 5, measure=True)]
+    circ_list = [
+        random_circuit(2, 2, measure=True),
+        random_circuit(4, 4, measure=True),
+        random_circuit(3, 3, measure=True),
+        random_circuit(5, 5, measure=True),
+    ]
     dag_list = [circuit_to_dag(circ) for circ in circ_list]
 
     caml = CrosstalkAdaptiveMultiLayout(bprop)
@@ -175,22 +174,27 @@ def test_run():
     g45 = Gate(name="CX4_5", gate="cx", parameters=p45, qubits=[4, 5])
     g25 = Gate(name="CX2_5", gate="cx", parameters=p25, qubits=[2, 5])
     gate_list = [g01, g03, g12, g14, g34, g45, g25]
-    bprop = BackendProperties(last_update_date=calib_time, backend_name="test_backend",
-                              qubits=qubit_list, backend_version="1.0.0", gates=gate_list,
-                              general=[])
+    bprop = BackendProperties(
+        last_update_date=calib_time, backend_name="test_backend",
+        qubits=qubit_list, backend_version="1.0.0", gates=gate_list,
+        general=[])
 
-    bprop = BackendProperties(last_update_date=calib_time, backend_name="test_backend",
-                              qubits=qubit_list, backend_version="1.0.0", gates=gate_list,
-                              general=[])
+    bprop = BackendProperties(
+        last_update_date=calib_time, backend_name="test_backend",
+        qubits=qubit_list, backend_version="1.0.0", gates=gate_list,
+        general=[])
 
-    circ_list = [random_circuit(2, 4, measure=True), random_circuit(
-        2, 3, measure=True)]
+    circ_list = [
+        random_circuit(1, 2, measure=True),
+        random_circuit(3, 5, measure=True),
+        random_circuit(2, 3, measure=True),
+    ]
     dag_list = [circuit_to_dag(circ) for circ in circ_list]
 
     caml = CrosstalkAdaptiveMultiLayout(bprop)
     # xtalk_prop = {(0, 1): {(1, 2): 3}, (3, 4): {(2, 3): 3}}
     # caml = CrosstalkAdaptiveMultiLayout(bprop, crosstalk_prop=xtalk_prop)
-    new_dag_list, layout = caml.run(dag_list)
+    new_dag, layout = caml.run(dag_list)
     pprint(layout)
     new_circ = dag_to_circuit(new_dag)
     print(new_circ)
@@ -201,6 +205,6 @@ if __name__ == "__main__":
     """
     test_crosstalk_backend_prop()
     """
-    test_create_program_graphs()
+    # test_create_program_graphs()
     # test_compose_dag()
-    # test_run()
+    test_run()
