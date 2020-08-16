@@ -49,6 +49,7 @@ def _compose_multicircuits(circuit_config_tuple: Tuple[List[QuantumCircuit], Dic
     """
 
     composed_multicircuit = QuantumCircuit(name=output_name)
+    name_list = []
     qubit_counter = 0
     for circuit in circuits:
         print("label = ", label)

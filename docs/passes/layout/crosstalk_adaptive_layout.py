@@ -3,16 +3,21 @@ import networkx as nx
 from qiskit.transpiler.layout import Layout
 from qiskit.transpiler.basepasses import AnalysisPass
 from qiskit.transpiler.exceptions import TranspilerError
+from qiskit import QuantumRegister, ClassicalRegister
+from qiskit.dagcircuit import DAGCircuit
 
 
 class CrosstalkAdaptiveMultiLayout(AnalysisPass):
-    def __init__(self, backend_prop, crosstalk_prop=None):
+    def __init__(self, backend_prop, crosstalk_prop=None, output_name=None):
 
         super().__init__()
         self.backend_prop = backend_prop
         self.crosstalk_prop = crosstalk_prop
         self.crosstalk_edges = []
         self.prog_graphs = []
+        self.dag_list = []
+        self.output_name = output_name
+        self.composed_multidag = DAGCircuit()
 
         self.swap_graph = nx.DiGraph()
         self.cx_reliability = {}
@@ -104,6 +109,7 @@ class CrosstalkAdaptiveMultiLayout(AnalysisPass):
         idx = 0
         prog_kqs = {}
         prog_graphs = {}
+        dags = {}
         for i, dag in enumerate(dag_list):
             dag_qubits = 0
             for q in dag.qubits:
@@ -125,9 +131,12 @@ class CrosstalkAdaptiveMultiLayout(AnalysisPass):
             # calculate KQ of dag (height * depth)
             dag_kq = dag_qubits * prog_depth
             prog_kqs[i] = dag_kq
-            prog_graphs[i] = dag
+            prog_graphs[i] = prog_graph
+            dags[i] = dag
 
         self.prog_graphs = [prog_graphs[dag_kq[0]] for dag_kq in sorted(
+            prog_kqs.items(), key=lambda x: x[1], reverse=True)]
+        self.dag_list = [dags[dag_kq[0]] for dag_kq in sorted(
             prog_kqs.items(), key=lambda x: x[1], reverse=True)]
         return idx
 
@@ -169,6 +178,8 @@ class CrosstalkAdaptiveMultiLayout(AnalysisPass):
 
     def _select_best_remaining_qubit(self, prog_qubit):
         """Select the best remaining hardware qubit for the next program qubit."""
+        # update gate_reliability with considering about xtalk
+        self._crosstalk_backend_prop()
         reliab_store = {}
         for hw_qubit in self.available_hw_qubits:
             reliab = 1
@@ -185,15 +196,46 @@ class CrosstalkAdaptiveMultiLayout(AnalysisPass):
                 best_hw_qubit = hw_qubit
         return best_hw_qubit
 
+    def _compose_dag(self, dag_list):
+        """Compose each dag and return new multitask dag"""
+
+        name_list = []
+        qubit_counter = 0
+        for i, dag in enumerate(dag_list):
+            # dag.remove_final_measurements()
+            register_size = dag.num_qubits()
+            reg_name_tmp = dag.qubits[0].register.name
+            register_name = reg_name_tmp if (reg_name_tmp not in name_list) and (
+                not reg_name_tmp == 'q') else None
+            name_list.append(register_name)
+            qr = QuantumRegister(size=register_size, name=register_name)
+            self.composed_multidag.add_qreg(qr)
+            qubits = self.composed_multidag.qubits[qubit_counter:qubit_counter+register_size]
+            #################################################################
+            cr = ClassicalRegister(size=register_size, name=register_name)
+            self.composed_multidag.add_creg(cr)
+            clbits = self.composed_multidag.clbits[qubit_counter:qubit_counter+register_size]
+            # composed_multidag = composed_multidag.compose(
+            # dag, qubits=qubits, clbits=clbits)
+            #################################################################
+            self.composed_multidag = self.composed_multidag.compose(
+                dag, qubits=qubits, inplace=False)
+            # cr = ClassicalRegister(size=register_size, name=register_name)
+            # composed_multidag.add_register(cr)
+            # composed_multidag.measure(qr, cr)
+
+            qubit_counter += register_size
+        return self.composed_multidag
+
     def run(self, dag_list):
         """Run the CrosstalkAdaptiveLayout pass on `list of dag`."""
         self._initialize_backend_prop()
-        num_qubits = self._create_program_graph(dag_list)
+        num_qubits = self._create_program_graph(dag_list=dag_list)
         if num_qubits > len(self.swap_graph):
             raise TranspilerError('Number of qubits greater than device.')
 
-        layout = Layout()
-        for prog_graph, dag in zip(self.prog_graphs, dag_list):
+        # layout = Layout()
+        for prog_graph, dag in zip(self.prog_graphs, self.dag_list):
             # sort by weight, then edge name for determinism (since networkx on python 3.5 returns
             # different order of edges)
             """NEXT STEP!
@@ -240,9 +282,11 @@ class CrosstalkAdaptiveMultiLayout(AnalysisPass):
                 if qid not in self.prog2hw:
                     self.prog2hw[qid] = self.available_hw_qubits[0]
                     self.available_hw_qubits.remove(self.prog2hw[qid])
-            # layout = Layout()
+            layout = Layout()
             for q in dag.qubits:
                 pid = self._qarg_to_id(q)
                 hwid = self.prog2hw[pid]
                 layout[q] = hwid
         self.property_set['layout'] = layout
+
+        return self.dag_list
