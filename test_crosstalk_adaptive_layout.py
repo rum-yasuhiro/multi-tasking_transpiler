@@ -79,11 +79,6 @@ def test_crosstalk_backend_prop():
 
 
 def test_create_program_graphs():
-
-    circ_list = [random_circuit(2, 2), random_circuit(
-        4, 4), random_circuit(3, 3), random_circuit(5, 5)]
-    dag_list = [circuit_to_dag(circ) for circ in circ_list]
-
     calib_time = datetime(year=2019, month=2, day=1,
                           hour=0, minute=0, second=0)
     qubit_list = []
@@ -100,13 +95,23 @@ def test_create_program_graphs():
                               qubits=qubit_list, backend_version="1.0.0", gates=gate_list,
                               general=[])
 
+    circ_list = [random_circuit(2, 10, measure=True), random_circuit(
+        4, 10, measure=True), random_circuit(3, 10, measure=True), random_circuit(5, 10, measure=True)]
+    dag_list = [circuit_to_dag(circ) for circ in circ_list]
+
     caml = CrosstalkAdaptiveMultiLayout(bprop)
-    num_q, prog_list, new_dag_list = caml._create_program_graphs(dag_list)
+    num_q, depths = caml._create_program_graphs(dag_list)
     print(num_q)
-    print(prog_list)
-    for dag in new_dag_list:
-        new_circ = dag_to_circuit(dag)
-        print(new_circ)
+    heights = []
+    kqs = []
+    for dag, depth in zip(caml.dag_list, depths):
+        height = dag.num_qubits()
+        kq = height * depth
+        heights.append(height)
+        kqs.append(kq)
+    print(heights)
+    print(depths)
+    print(kqs)
 
 
 def test_compose_dag():
@@ -179,14 +184,14 @@ def test_run():
                               general=[])
 
     circ_list = [random_circuit(2, 4, measure=True), random_circuit(
-        2, 3, measure=True), random_circuit(2, 2, measure=True)]
+        2, 3, measure=True)]
     dag_list = [circuit_to_dag(circ) for circ in circ_list]
 
     caml = CrosstalkAdaptiveMultiLayout(bprop)
     # xtalk_prop = {(0, 1): {(1, 2): 3}, (3, 4): {(2, 3): 3}}
     # caml = CrosstalkAdaptiveMultiLayout(bprop, crosstalk_prop=xtalk_prop)
-    new_dag_list = caml.run(dag_list)
-
+    new_dag_list, layout = caml.run(dag_list)
+    pprint(layout)
     new_circ = dag_to_circuit(new_dag)
     print(new_circ)
 
@@ -196,6 +201,6 @@ if __name__ == "__main__":
     """
     test_crosstalk_backend_prop()
     """
-    # test_create_program_graphs()
+    test_create_program_graphs()
     # test_compose_dag()
-    test_run()
+    # test_run()

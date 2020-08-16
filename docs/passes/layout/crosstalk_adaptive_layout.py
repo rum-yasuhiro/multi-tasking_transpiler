@@ -18,7 +18,6 @@ class CrosstalkAdaptiveMultiLayout(BasePass):
         self.crosstalk_prop = crosstalk_prop
         self.crosstalk_edges = []
         self.prog_graphs = []
-        self.prog_graph = None
         self.dag_list = []
         self.output_name = output_name
         self.composed_multidag = DAGCircuit()
@@ -111,7 +110,6 @@ class CrosstalkAdaptiveMultiLayout(BasePass):
     def _create_program_graphs(self, dag_list):
         idx = 0
         prog_kqs = {}
-        prog_graphs = {}
         dags = {}
         for i, dag in enumerate(dag_list):
             dag_q_id = 0
@@ -119,7 +117,7 @@ class CrosstalkAdaptiveMultiLayout(BasePass):
                 self.qarg_to_id[q.register.name + str(q.index)] = dag_q_id
                 dag_q_id += 1
             idx += dag_q_id
-            prog_graph = nx.Graph()
+            _prog_graph = nx.Graph()
             prog_depth = 0
             for gate in dag.two_qubit_ops():
                 qid1 = self._qarg_to_id(gate.qargs[0])
@@ -127,22 +125,43 @@ class CrosstalkAdaptiveMultiLayout(BasePass):
                 min_q = min(qid1, qid2)
                 max_q = max(qid1, qid2)
                 edge_weight = 1
-                if prog_graph.has_edge(min_q, max_q):
-                    edge_weight = prog_graph[min_q][max_q]['weight'] + 1
-                prog_graph.add_edge(min_q, max_q, weight=edge_weight)
+                if _prog_graph.has_edge(min_q, max_q):
+                    edge_weight = _prog_graph[min_q][max_q]['weight'] + 1
+                _prog_graph.add_edge(min_q, max_q, weight=edge_weight)
                 prog_depth += edge_weight
             # calculate KQ of dag (height * depth)
             dag_kq = dag_q_id * prog_depth
             prog_kqs[i] = dag_kq
-            prog_graphs[i] = prog_graph
             dags[i] = dag
 
-        self.prog_graphs = [prog_graphs[dag_kq[0]] for dag_kq in sorted(
-            prog_kqs.items(), key=lambda x: x[1], reverse=True)]
         self.dag_list = [dags[dag_kq[0]] for dag_kq in sorted(
             prog_kqs.items(), key=lambda x: x[1], reverse=True)]
 
-        return idx
+        """FIXME
+        # self.prog_graphs = [prog_graphs[dag_kq[0]] for dag_kq in sorted(
+        #     prog_kqs.items(), key=lambda x: x[1], reverse=True)]
+        """
+        ###############
+        depths = []
+        ###############
+        reg_counter = 0
+        for dag in self.dag_list:
+            prog_graph = nx.Graph()
+            for gate in dag.two_qubit_ops():
+                qid1 = self._qarg_to_id(gate.qargs[0])+reg_counter
+                qid2 = self._qarg_to_id(gate.qargs[1])+reg_counter
+                min_q = min(qid1, qid2)
+                max_q = max(qid1, qid2)
+                edge_weight = 1
+                if prog_graph.has_edge(min_q, max_q):
+                    edge_weight = prog_graph[min_q][max_q]['weight'] + 1
+                prog_graph.add_edge(min_q, max_q, weight=edge_weight)
+            #######################
+            depths.append(edge_weight)
+            #######################
+            self.prog_graphs.append(prog_graph)
+            reg_counter += dag.num_qubits()
+        return idx, depths
 
     def _qarg_to_id(self, qubit):
         """Convert qarg with name and value to an integer id."""
@@ -305,4 +324,4 @@ class CrosstalkAdaptiveMultiLayout(BasePass):
             layout[q] = hwid
         self.property_set['layout'] = layout
 
-        return new_dag
+        return new_dag, layout
