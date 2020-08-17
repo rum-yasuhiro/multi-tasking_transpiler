@@ -1,16 +1,16 @@
 import math
 import networkx as nx
 from qiskit.transpiler.layout import Layout
-# from qiskit.transpiler.basepasses import AnalysisPass
+from qiskit.transpiler.basepasses import AnalysisPass
 #################################################
-from qiskit.transpiler.basepasses import BasePass
+# from qiskit.transpiler.basepasses import BasePass
 #################################################
 from qiskit.transpiler.exceptions import TranspilerError
 from qiskit import QuantumRegister, ClassicalRegister
 from qiskit.dagcircuit import DAGCircuit
 
 
-class CrosstalkAdaptiveMultiLayout(BasePass):
+class CrosstalkAdaptiveMultiLayout(AnalysisPass):
     def __init__(self, backend_prop, crosstalk_prop=None, output_name=None):
 
         super().__init__()
