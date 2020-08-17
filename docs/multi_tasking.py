@@ -1,12 +1,15 @@
 from typing import List, Tuple, Dict, Union, Optional
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
 from qiskit.tools.parallel import parallel_map
+from qiskit.transpiler.passes import ApplyLayout
+from qiskit.converters import circuit_to_dag, dag_to_circuit
 
 
 def multitasking_compose(multi_circuits: Union[QuantumCircuit, List[QuantumCircuit]],
                          backend=None,
                          backend_properties=None,
                          output_names=None,
+                         layout_method=None,
                          ) -> Union[QuantumCircuit, List[QuantumCircuit]]:
     """Mapping several circuits to single circuit based on calibration for the backend
 
@@ -121,7 +124,11 @@ def _perse_output_names(output_names, num_circuits):
     if output_names is None:
         output_names = [None] * num_circuits
     if output_names is not list:
-        output_names = [output_names+"_"+str(i) for i in range(num_circuits)]
+        if num_circuits != 1:
+            output_names = [output_names+"_" +
+                            str(i) for i in range(num_circuits)]
+        else:
+            output_names = [output_names]
     return output_names
 
 
