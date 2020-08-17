@@ -25,6 +25,27 @@ def multitasking_compose(multi_circuits: Union[QuantumCircuit, List[QuantumCircu
     multi_circuits = multi_circuits if isinstance(
         multi_circuits[0], list) else [multi_circuits]
 
+    if layout_method is not None:
+        if output_names is not None:
+            output_names = _perse_output_names(
+                output_names, len(multi_circuits))
+        circuits = []
+        for i, circuit_set in enumerate(multi_circuits):
+            dag_list = [circuit_to_dag(circ) for circ in circuit_set]
+            new_dag = layout_method.run(dag_list)
+            new_circ = dag_to_circuit(new_dag)
+            """FIXME
+            logical -> physicalのマッピングがうまくいってない
+
+            Code: 
+            new_circ._layout = layout_method.property_set['layout']
+            """
+            if isinstance(output_names, list) and output_names[i] is not None:
+                new_circ.name = output_names[i]
+            circuits.append(new_circ)
+        if len(circuits) == 1:
+            return circuits[0]
+        return circuits
     # Get combine_args(mp_args) to configure the circuit combine job(s)
     combine_args = _parse_combine_args(
         multi_circuits, backend, backend_properties, output_names)

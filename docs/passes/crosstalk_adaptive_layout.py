@@ -362,4 +362,4 @@ class CrosstalkAdaptiveMultiLayout(AnalysisPass):
             layout[q] = hwid
         self.property_set['layout'] = layout
 
-        return new_dag, layout
+        return new_dag

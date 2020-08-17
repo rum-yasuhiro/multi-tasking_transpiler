@@ -179,11 +179,6 @@ def test_run():
         qubits=qubit_list, backend_version="1.0.0", gates=gate_list,
         general=[])
 
-    bprop = BackendProperties(
-        last_update_date=calib_time, backend_name="test_backend",
-        qubits=qubit_list, backend_version="1.0.0", gates=gate_list,
-        general=[])
-
     circ_list = [
         random_circuit(1, 2, measure=True),
         random_circuit(3, 5, measure=True),
@@ -194,8 +189,8 @@ def test_run():
     caml = CrosstalkAdaptiveMultiLayout(bprop)
     # xtalk_prop = {(0, 1): {(1, 2): 3}, (3, 4): {(2, 3): 3}}
     # caml = CrosstalkAdaptiveMultiLayout(bprop, crosstalk_prop=xtalk_prop)
-    new_dag, layout = caml.run(dag_list)
-    pprint(layout)
+    new_dag = caml.run(dag_list)
+    pprint(caml.property_set['layout'])
     new_circ = dag_to_circuit(new_dag)
     print(new_circ)
 
