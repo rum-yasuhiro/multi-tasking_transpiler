@@ -1,4 +1,4 @@
-from docs.passes.layout.crosstalk_adaptive_layout import CrosstalkAdaptiveMultiLayout
+from docs.passes.crosstalk_adaptive_layout import CrosstalkAdaptiveMultiLayout
 
 from datetime import datetime
 import unittest
