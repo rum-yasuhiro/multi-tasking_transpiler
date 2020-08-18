@@ -1,6 +1,7 @@
 from datetime import datetime
 from pprint import pprint
 
+from qiskit.compiler import transpile
 from qiskit.circuit.random import random_circuit
 from qiskit import QuantumCircuit, IBMQ
 from qiskit.providers.models import BackendProperties
@@ -18,6 +19,12 @@ def make_qubit_with_error(readout_error):
             Nduv(name="T2", date=calib_time, unit="µs", value=100.0),
             Nduv(name="frequency", date=calib_time, unit="GHz", value=5.0),
             Nduv(name="readout_error", date=calib_time, unit="", value=readout_error)]
+
+
+def decompose_to_base_gates(circ):
+    basis_gates = ['u1', 'u2', 'u3', 'cx']
+    transpiled_circ = transpile(circ, basis_gates)
+    return transpiled_circ
 
 
 def test_parse_backend_properties():
@@ -131,6 +138,8 @@ def test_noiseadaptive_multitask_layout():
         random_circuit(3, 5, measure=True),
         random_circuit(2, 3, measure=True),
     ]
+    circ_list = [circ.decompose() for circ in circ_list]
+
     # combine circuits
     multi_programming_circuit = multitasking_compose(
         multi_circuits=circ_list, layout_method=layout_pass)
