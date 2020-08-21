@@ -35,11 +35,12 @@ def multitasking_compose(multi_circuits: Union[QuantumCircuit, List[QuantumCircu
             new_dag = layout_method.run(dag_list)
             new_circ = dag_to_circuit(new_dag)
             """FIXME
-            logical -> physicalのマッピングがうまくいってない
+            logical ->physicalのmappingが
 
             Code: 
-            new_circ._layout = layout_method.property_set['layout']
+            
             """
+            new_circ._layout = layout_method.property_set['layout']
             if isinstance(output_names, list) and output_names[i] is not None:
                 new_circ.name = output_names[i]
             circuits.append(new_circ)
