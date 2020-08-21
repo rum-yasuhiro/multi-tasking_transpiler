@@ -108,34 +108,6 @@ def test_noiseadaptive_multitask_layout():
 
     calib_time = datetime(year=2020, month=8, day=1,
                           hour=0, minute=0, second=0)
-    # qubit_list = []
-    # ro_errors = [0.01]*6
-    # for ro_error in ro_errors:
-    #     qubit_list.append(make_qubit_with_error(ro_error))
-    # p01 = [Nduv(date=calib_time, name='gate_error', unit='', value=0.3)]
-    # p03 = [Nduv(date=calib_time, name='gate_error', unit='', value=0.3)]
-    # p12 = [Nduv(date=calib_time, name='gate_error', unit='', value=0.3)]
-    # p14 = [Nduv(date=calib_time, name='gate_error', unit='', value=0.1)]
-    # p34 = [Nduv(date=calib_time, name='gate_error', unit='', value=0.1)]
-    # p45 = [Nduv(date=calib_time, name='gate_error', unit='', value=0.1)]
-    # p25 = [Nduv(date=calib_time, name='gate_error', unit='', value=0.3)]
-    # g01 = Gate(name="CX0_1", gate="cx", parameters=p01, qubits=[0, 1])
-    # g03 = Gate(name="CX0_3", gate="cx", parameters=p03, qubits=[0, 3])
-    # g12 = Gate(name="CX1_2", gate="cx", parameters=p12, qubits=[1, 2])
-    # g14 = Gate(name="CX1_4", gate="cx", parameters=p14, qubits=[1, 4])
-    # g34 = Gate(name="CX3_4", gate="cx", parameters=p34, qubits=[3, 4])
-    # g45 = Gate(name="CX4_5", gate="cx", parameters=p45, qubits=[4, 5])
-    # g25 = Gate(name="CX2_5", gate="cx", parameters=p25, qubits=[2, 5])
-    # gate_list = [g01, g03, g12, g14, g34, g45, g25]
-    # bprop = BackendProperties(
-    #     last_update_date=calib_time, backend_name="test_backend",
-    #     qubits=qubit_list, backend_version="1.0.0", gates=gate_list,
-    #     general=[])
-
-    # bprop = BackendProperties(
-    #     last_update_date=calib_time, backend_name="test_backend",
-    #     qubits=qubit_list, backend_version="1.0.0", gates=gate_list,
-    #     general=[])
 
     bprop = backend.properties(datetime=calib_time)
 
@@ -143,7 +115,7 @@ def test_noiseadaptive_multitask_layout():
 
     circ_list = [
         random_circuit(1, 2, measure=True),
-        random_circuit(3, 5, measure=True),
+        random_circuit(6, 5, measure=True),
         random_circuit(2, 3, measure=True),
     ]
     circ_list = decompose_to_base_gates(circ_list)

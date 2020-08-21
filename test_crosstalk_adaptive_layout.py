@@ -214,16 +214,18 @@ def test_run():
 
     circ_list = [
         # random_circuit(1, 2, measure=True),
-        random_circuit(3, 3, measure=True, seed=1),
+        # random_circuit(3, 3, measure=True, seed=1),
         random_circuit(2, 3, measure=True, seed=1),
     ]
-    circ_list = decompose_to_base_gates(circ_list)
+    circ_list = decompose_to_base_gates(circ_list) if isinstance(
+        decompose_to_base_gates(circ_list), list) else [decompose_to_base_gates(circ_list)]
     dag_list = [circuit_to_dag(circ) for circ in circ_list]
 
     caml = CrosstalkAdaptiveMultiLayout(bprop)
     new_dag = caml.run(dag_list)
     pprint(caml.property_set['layout'])
     new_circ = dag_to_circuit(new_dag)
+    new_circ._layout = caml.property_set['layout']
     print(new_circ)
 
 
