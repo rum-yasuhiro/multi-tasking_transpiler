@@ -2,9 +2,6 @@ import math
 import networkx as nx
 from qiskit.transpiler.layout import Layout
 from qiskit.transpiler.basepasses import AnalysisPass
-#################################################
-# from qiskit.transpiler.basepasses import BasePass
-#################################################
 from qiskit.transpiler.exceptions import TranspilerError
 from qiskit import QuantumRegister, ClassicalRegister
 from qiskit.dagcircuit import DAGCircuit

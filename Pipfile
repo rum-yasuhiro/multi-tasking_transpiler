@@ -6,7 +6,7 @@ verify_ssl = true
 [dev-packages]
 
 [packages]
-qiskit = "*"
+qiskit = "==0.20.0"
 pydot = "*"
 
 [requires]
