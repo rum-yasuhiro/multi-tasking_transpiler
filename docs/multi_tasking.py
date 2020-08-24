@@ -2,15 +2,17 @@ from typing import List, Tuple, Dict, Union, Optional
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
 from qiskit.tools.parallel import parallel_map
 from qiskit.transpiler.passes import ApplyLayout
+from qiskit.dagcircuit import DAGCircuit
 from qiskit.converters import circuit_to_dag, dag_to_circuit
+from qiskit.compiler import transpile
 
 
-def multitasking_compose(multi_circuits: Union[QuantumCircuit, List[QuantumCircuit]],
-                         backend=None,
-                         backend_properties=None,
-                         output_names=None,
-                         layout_method=None,
-                         ) -> Union[QuantumCircuit, List[QuantumCircuit]]:
+def multitasking_transpile(multi_circuits: Union[QuantumCircuit, List[QuantumCircuit]],
+                           backend=None,
+                           backend_properties=None,
+                           output_names=None,
+                           layout_method=None,
+                           ) -> Union[QuantumCircuit, List[QuantumCircuit]]:
     """Mapping several circuits to single circuit based on calibration for the backend
 
     Args:
@@ -76,19 +78,61 @@ def _compose_multicircuits(circuit_config_tuple: Tuple[List[QuantumCircuit], Dic
     composed_multicircuit = QuantumCircuit(name=output_name)
     name_list = []
     bit_counter = 0
-    for circuit in circuits:
-        register_size = circuit.num_qubits
+    dag_list = [circuit_to_dag(circuit) for circuit in circuits]
+    return dag_to_circuit(_compose_dag(dag_list))
+    # for circuit in circuits:
+    #     register_size = circuit.num_qubits
 
-        """FIXME!
-        # register_name: register nameを定義すると、outputの `new_dag` に対して `dag_to_circuit()`
-        # を実行した時、
-        # qiskit.circuit.exceptions.CircuitError: 'register name "定義した名前" already exists'
-        # が発生するため、任意のレジスター名をつけることができない
-        
-        reg_name_tmp = circuit.qubits[0].register.name
-        register_name = circuit.qubits[0].register.name if circuit.qubits[
-            0].register.name not in name_list else None
-        name_list.append(register_name)
+    #     """FIXME!
+    #     # register_name: register nameを定義すると、outputの `new_dag` に対して `dag_to_circuit()`
+    #     # を実行した時、
+    #     # qiskit.circuit.exceptions.CircuitError: 'register name "定義した名前" already exists'
+    #     # が発生するため、任意のレジスター名をつけることができない
+
+    #     reg_name_tmp = circuit.qubits[0].register.name
+    #     register_name = circuit.qubits[0].register.name if circuit.qubits[
+    #         0].register.name not in name_list else None
+    #     name_list.append(register_name)
+    #     """
+    #     # 上記FIXME部分はNoneで対応中: 2020 / 08 / 16
+    #     register_name = None
+    #     ########################
+
+    #     qr = QuantumRegister(size=register_size, name=register_name)
+    #     cr = ClassicalRegister(size=register_size, name=register_name)
+    #     composed_multicircuit.add_register(qr)
+    #     composed_multicircuit.add_register(cr)
+    #     qubits = composed_multicircuit.qubits[bit_counter:bit_counter+register_size]
+    #     clbits = composed_multicircuit.clbits[bit_counter:bit_counter+register_size]
+    #     composed_multicircuit = composed_multicircuit.compose(
+    #         circuit, qubits=qubits, clbits=clbits)
+
+    #     bit_counter += register_size
+    # return composed_multicircuit
+
+
+def _compose_dag(dag_list):
+    """Compose each dag and return new multitask dag"""
+
+    """FIXME 下記と同様
+    # name_list = []
+    """
+    bit_counter = 0
+    composed_multidag = DAGCircuit()
+    for i, dag in enumerate(dag_list):
+        register_size = dag.num_qubits()
+        """FIXME
+        Problem:
+            register_name: register nameを定義すると、outputの `new_dag` に対して `dag_to_circuit()`
+            を実行した時、
+            qiskit.circuit.exceptions.CircuitError: 'register name "定義した名前" already exists'
+            が発生するため、任意のレジスター名をつけることができない
+
+        Code:
+            reg_name_tmp = dag.qubits[0].register.name
+            register_name = reg_name_tmp if (reg_name_tmp not in name_list) and (
+                not reg_name_tmp == 'q') else None
+            name_list.append(register_name)
         """
         # 上記FIXME部分はNoneで対応中: 2020 / 08 / 16
         register_name = None
@@ -96,15 +140,14 @@ def _compose_multicircuits(circuit_config_tuple: Tuple[List[QuantumCircuit], Dic
 
         qr = QuantumRegister(size=register_size, name=register_name)
         cr = ClassicalRegister(size=register_size, name=register_name)
-        composed_multicircuit.add_register(qr)
-        composed_multicircuit.add_register(cr)
-        qubits = composed_multicircuit.qubits[bit_counter:bit_counter+register_size]
-        clbits = composed_multicircuit.clbits[bit_counter:bit_counter+register_size]
-        composed_multicircuit = composed_multicircuit.compose(
-            circuit, qubits=qubits, clbits=clbits)
+        composed_multidag.add_qreg(qr)
+        composed_multidag.add_creg(cr)
+        qubits = composed_multidag.qubits[bit_counter:bit_counter+register_size]
+        clbits = composed_multidag.clbits[bit_counter:bit_counter+register_size]
+        composed_multidag.compose(dag, qubits=qubits, clbits=clbits)
 
         bit_counter += register_size
-    return composed_multicircuit
+    return composed_multidag
 
 
 def _parse_combine_args(multi_circuits, backend, backend_propaerties, output_names) -> List[Dict]:
