@@ -86,7 +86,8 @@ def _multitasking_transpile(circuit_config_tuple: Tuple[List[QuantumCircuit], Di
     pass_manager_config = transpile_config['pass_manager_config']
     crosstalk_prop = transpile_config['crosstalk_prop']
 
-    if crosstalk_prop[0] is not None:
+    print(crosstalk_prop)
+    if isinstance(crosstalk_prop, Dict):
         pass_manager = multi_tasking_pass_manager(
             pass_manager_config, crosstalk_prop)
 
@@ -478,6 +479,7 @@ def _parse_output_name(output_name, num_circuits):
 def _parse_crosstalk_prop(crosstalk_prop, num_circuits):
     # try getting backend_properties from user, else return None
     if crosstalk_prop is None:
+        print("############### it works ##############")
         crosstalk_prop = [None] * num_circuits
     if crosstalk_prop is not list:
         crosstalk_prop = [crosstalk_prop] * num_circuits
