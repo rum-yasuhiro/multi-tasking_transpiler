@@ -15,9 +15,7 @@ class CrosstalkAdaptiveMultiLayout(AnalysisPass):
         self.crosstalk_prop = self._parse_crosstalk_prop(crosstalk_prop)
         self.crosstalk_edges = []
         self.prog_graphs = []
-        self.dag_list = []
         self.output_name = output_name
-        self.composed_multidag = DAGCircuit()
         self.consumed_hw_edges = []
 
         self.swap_graph = nx.DiGraph()
@@ -128,55 +126,61 @@ class CrosstalkAdaptiveMultiLayout(AnalysisPass):
             self.crosstalk_edges.append(edge)
             self._update_edge_prop()
 
-    def _create_program_graphs(self, dag_list):
-        idx = 0
-        prog_kqs = {}
-        dags = {}
-        for i, dag in enumerate(dag_list):
-            num_q = 0
-            for q in dag.qubits:
-                self.qarg_to_id[q.register.name + str(q.index)] = num_q
-                num_q += 1
-            idx += num_q
-            _prog_graph = nx.Graph()
-            prog_depth = 0
-            for gate in dag.two_qubit_ops():
-                qid1 = self._qarg_to_id(gate.qargs[0])
-                qid2 = self._qarg_to_id(gate.qargs[1])
-                min_q = min(qid1, qid2)
-                max_q = max(qid1, qid2)
-                edge_weight = 1
-                if _prog_graph.has_edge(min_q, max_q):
-                    edge_weight = _prog_graph[min_q][max_q]['weight'] + 1
-                _prog_graph.add_edge(min_q, max_q, weight=edge_weight)
-                prog_depth += edge_weight
-            # calculate KQ of dag (height * depth)
-            kq = num_q * prog_depth
-            prog_kqs[i] = kq
-            dags[i] = dag
-        self.dag_list = [dags[id_kq[0]] for id_kq in sorted(
-            prog_kqs.items(), key=lambda x: x[1], reverse=True)]
+    def _parse_crosstalk_prop(self, crosstalk_prop):
+        if crosstalk_prop is not None:
+            sorted_prop = {}
+            for _edge in crosstalk_prop:
+                q0 = min(_edge[0], _edge[1])
+                q1 = max(_edge[0], _edge[1])
+                edge = (q0, q1)
+                sorted_prop[edge] = {}
+                for _xtalk_edge in crosstalk_prop[_edge]:
+                    q0 = min(_xtalk_edge[0], _xtalk_edge[1])
+                    q1 = max(_xtalk_edge[0], _xtalk_edge[1])
+                    xtalk_edge = (q0, q1)
+                    xtalk_ratio = crosstalk_prop[_edge][_xtalk_edge]
+                    sorted_prop[edge][xtalk_edge] = xtalk_ratio
+            return sorted_prop
+        return None
 
-        """FIXME
-        # self.prog_graphs = [prog_graphs[dag_kq[0]] for dag_kq in sorted(
-        #     prog_kqs.items(), key=lambda x: x[1], reverse=True)]
+    def _create_program_graphs(self, dag):
+        """Program graph has virtual qubits as nodes.
+
+        Two nodes have an edge if the corresponding virtual qubits
+        participate in a 2-qubit gate. The edge is weighted by the
+        number of CNOTs between the pair.
         """
-        reg_counter = 0
+        idx = 0
+        for q in dag.qubits:
+            self.qarg_to_id[q.register.name + str(q.index)] = idx
+            idx += 1
+        prog_graph = nx.Graph()
+        for gate in dag.two_qubit_ops():
+            qid1 = self._qarg_to_id(gate.qargs[0])
+            qid2 = self._qarg_to_id(gate.qargs[1])
+            min_q = min(qid1, qid2)
+            max_q = max(qid1, qid2)
+            edge_weight = 1
+            if prog_graph.has_edge(min_q, max_q):
+                edge_weight = prog_graph[min_q][max_q]['weight'] + 1
+            prog_graph.add_edge(min_q, max_q, weight=edge_weight)
 
-        for dag in self.dag_list:
-            prog_graph = nx.Graph()
-            for gate in dag.two_qubit_ops():
-                qid1 = self._qarg_to_id(gate.qargs[0])+reg_counter
-                qid2 = self._qarg_to_id(gate.qargs[1])+reg_counter
-                min_q = min(qid1, qid2)
-                max_q = max(qid1, qid2)
-                edge_weight = 1
-                if prog_graph.has_edge(min_q, max_q):
-                    edge_weight = prog_graph[min_q][max_q]['weight'] + 1
-                prog_graph.add_edge(min_q, max_q, weight=edge_weight)
-            self.prog_graphs.append(prog_graph)
-            reg_counter += dag.num_qubits()
+        prog_subgraphs = list(prog_graph.subgraph(c)
+                              for c in nx.connected_components(prog_graph))
+        self.prog_graphs = self._sort_graphs(prog_subgraphs)
         return idx
+
+    def _sort_graphs(self, graph_list):
+        """
+        w: total weight of edges in graph
+
+        """
+        graph_volumes = {}
+        order = []
+        for i, graph in enumerate(graph_list):
+            graph_volumes[i] = graph.size(
+                weight="weight") * graph.number_of_nodes()
+        return [graph_list[id_kq[0]] for id_kq in sorted(graph_volumes.items(), key=lambda x: x[1], reverse=True)]
 
     def _qarg_to_id(self, qubit):
         """Convert qarg with name and value to an integer id."""
@@ -230,47 +234,47 @@ class CrosstalkAdaptiveMultiLayout(AnalysisPass):
                 best_hw_qubit = hw_qubit
         return best_hw_qubit
 
-    def _compose_dag(self, dag_list):
-        """Compose each dag and return new multitask dag"""
+    # def _compose_dag(self, dag_list):
+    #     """Compose each dag and return new multitask dag"""
 
-        """FIXME 下記と同様
-        # name_list = []
-        """
-        bit_counter = 0
-        for i, dag in enumerate(dag_list):
-            register_size = dag.num_qubits()
-            """FIXME
-            Problem:
-                register_name: register nameを定義すると、outputの `new_dag` に対して `dag_to_circuit()`
-                を実行した時、
-                qiskit.circuit.exceptions.CircuitError: 'register name "定義した名前" already exists'
-                が発生するため、任意のレジスター名をつけることができない
+    #     """FIXME 下記と同様
+    #     # name_list = []
+    #     """
+    #     bit_counter = 0
+    #     for i, dag in enumerate(dag_list):
+    #         register_size = dag.num_qubits()
+    #         """FIXME
+    #         Problem:
+    #             register_name: register nameを定義すると、outputの `new_dag` に対して `dag_to_circuit()`
+    #             を実行した時、
+    #             qiskit.circuit.exceptions.CircuitError: 'register name "定義した名前" already exists'
+    #             が発生するため、任意のレジスター名をつけることができない
 
-            Code:
-                reg_name_tmp = dag.qubits[0].register.name
-                register_name = reg_name_tmp if (reg_name_tmp not in name_list) and (
-                    not reg_name_tmp == 'q') else None
-                name_list.append(register_name)
-            """
-            # 上記FIXME部分はNoneで対応中: 2020 / 08 / 16
-            register_name = None
-            ########################
+    #         Code:
+    #             reg_name_tmp = dag.qubits[0].register.name
+    #             register_name = reg_name_tmp if (reg_name_tmp not in name_list) and (
+    #                 not reg_name_tmp == 'q') else None
+    #             name_list.append(register_name)
+    #         """
+    #         # 上記FIXME部分はNoneで対応中: 2020 / 08 / 16
+    #         register_name = None
+    #         ########################
 
-            qr = QuantumRegister(size=register_size, name=register_name)
-            cr = ClassicalRegister(size=register_size, name=register_name)
-            self.composed_multidag.add_qreg(qr)
-            self.composed_multidag.add_creg(cr)
-            qubits = self.composed_multidag.qubits[bit_counter:bit_counter+register_size]
-            clbits = self.composed_multidag.clbits[bit_counter:bit_counter+register_size]
-            self.composed_multidag.compose(dag, qubits=qubits, clbits=clbits)
+    #         qr = QuantumRegister(size=register_size, name=register_name)
+    #         cr = ClassicalRegister(size=register_size, name=register_name)
+    #         self.composed_multidag.add_qreg(qr)
+    #         self.composed_multidag.add_creg(cr)
+    #         qubits = self.composed_multidag.qubits[bit_counter:bit_counter+register_size]
+    #         clbits = self.composed_multidag.clbits[bit_counter:bit_counter+register_size]
+    #         self.composed_multidag.compose(dag, qubits=qubits, clbits=clbits)
 
-            bit_counter += register_size
-        return self.composed_multidag
+    #         bit_counter += register_size
+    #     return self.composed_multidag
 
-    def run(self, dag_list):
+    def run(self, dag):
         """Run the CrosstalkAdaptiveLayout pass on `list of dag`."""
         self._initialize_backend_prop()
-        num_qubits = self._create_program_graphs(dag_list=dag_list)
+        num_qubits = self._create_program_graphs(dag=dag)
         ########################
         print(self.available_hw_qubits)
         print("num_qubits: ", num_qubits)
@@ -278,8 +282,7 @@ class CrosstalkAdaptiveMultiLayout(AnalysisPass):
         if num_qubits > len(self.available_hw_qubits):
             raise TranspilerError('Number of qubits greater than device.')
 
-        new_dag = self._compose_dag(self.dag_list)
-        for hwid, q in enumerate(new_dag.qubits):
+        for hwid, q in enumerate(dag.qubits):
             self.qarg_to_id[q.register.name + str(q.index)] = hwid
 
         for prog_graph in self.prog_graphs:
@@ -321,7 +324,7 @@ class CrosstalkAdaptiveMultiLayout(AnalysisPass):
                     self.available_hw_qubits.remove(best_hw_qubit)
                     # update gate_reliability with considering about xtalk
                     self._crosstalk_backend_prop(
-                        edge=(self.prog2hw[1], best_hw_qubit))
+                        edge=(self.prog2hw[edge[1]], best_hw_qubit))
                 else:
                     best_hw_qubit = self._select_best_remaining_qubit(
                         edge[1], prog_graph)
@@ -332,7 +335,7 @@ class CrosstalkAdaptiveMultiLayout(AnalysisPass):
                     self.prog2hw[edge[1]] = best_hw_qubit
                     self.available_hw_qubits.remove(best_hw_qubit)
                     self._crosstalk_backend_prop(
-                        edge=(self.prog2hw[0], best_hw_qubit))
+                        edge=(self.prog2hw[edge[0]], best_hw_qubit))
                 new_edges = [x for x in self.pending_program_edges
                              if not (x[0] in self.prog2hw and x[1] in self.prog2hw)]
 
@@ -344,29 +347,10 @@ class CrosstalkAdaptiveMultiLayout(AnalysisPass):
                 self.available_hw_qubits.remove(self.prog2hw[qid])
 
         layout_dict = {}
-        for q in new_dag.qubits:
+        for q in dag.qubits:
             pid = self._qarg_to_id(q)
             hwid = self.prog2hw[pid]
             # layout[q] = hwid
             layout_dict[q] = hwid
             print("prog: {} , hw: {}".format(q, hwid))
         self.property_set['layout'] = Layout(input_dict=layout_dict)
-
-        return new_dag
-
-    def _parse_crosstalk_prop(self, crosstalk_prop):
-        if crosstalk_prop is not None:
-            sorted_prop = {}
-            for _edge in crosstalk_prop:
-                q0 = min(_edge[0], _edge[1])
-                q1 = max(_edge[0], _edge[1])
-                edge = (q0, q1)
-                sorted_prop[edge] = {}
-                for _xtalk_edge in crosstalk_prop[_edge]:
-                    q0 = min(_xtalk_edge[0], _xtalk_edge[1])
-                    q1 = max(_xtalk_edge[0], _xtalk_edge[1])
-                    xtalk_edge = (q0, q1)
-                    xtalk_ratio = crosstalk_prop[_edge][_xtalk_edge]
-                    sorted_prop[edge][xtalk_edge] = xtalk_ratio
-            return sorted_prop
-        return None
