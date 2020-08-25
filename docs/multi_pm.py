@@ -11,7 +11,7 @@ from qiskit.transpiler.passes import SetLayout
 # from qiskit.transpiler.passes import CSPLayout
 # from qiskit.transpiler.passes import TrivialLayout
 # from qiskit.transpiler.passes import DenseLayout
-from qiskit.transpiler.passes import NoiseAdaptiveLayout
+# from qiskit.transpiler.passes import NoiseAdaptiveLayout
 # from qiskit.transpiler.passes import SabreLayout
 from qiskit.transpiler.passes import BarrierBeforeFinalMeasurements
 from qiskit.transpiler.passes import BasicSwap
@@ -38,37 +38,19 @@ from docs.passes.crosstalk_adaptive_layout import CrosstalkAdaptiveMultiLayout
 from qiskit.transpiler import TranspilerError
 
 
-def multi_tasking_pass_manager(pass_manager_config: PassManagerConfig) -> PassManager:
-    """Level 3 pass manager: heavy optimization by noise adaptive qubit mapping and
-    gate cancellation using commutativity rules and unitary synthesis.
-    This pass manager applies the user-given initial layout. If none is given, a search
-    for a perfect layout (i.e. one that satisfies all 2-qubit interactions) is conducted.
-    If no such layout is found, and device calibration information is available, the
-    circuit is mapped to the qubits with best readouts and to CX gates with highest fidelity.
-    The pass manager then transforms the circuit to match the coupling constraints.
-    It is then unrolled to the basis, and any flipped cx directions are fixed.
-    Finally, optimizations in the form of commutative gate cancellation, resynthesis
-    of two-qubit unitary blocks, and redundant reset removal are performed.
-    Note:
-        In simulators where ``coupling_map=None``, only the unrolling and
-        optimization stages are done.
-    Args:
-        pass_manager_config: configuration of the pass manager.
-    Returns:
-        a level 3 pass manager.
-    Raises:
-        TranspilerError: if the passmanager config is invalid.
-    """
+def multi_tasking_pass_manager(pass_manager_config: PassManagerConfig, crosstalk_prop=None) -> PassManager:
     basis_gates = pass_manager_config.basis_gates
     coupling_map = pass_manager_config.coupling_map
     initial_layout = pass_manager_config.initial_layout
     # layout_method = pass_manager_config.layout_method or 'dense'
-    routing_method = pass_manager_config.routing_method or 'stochastic'
-    translation_method = pass_manager_config.translation_method or 'translator'
+    # routing_method = pass_manager_config.routing_method or 'stochastic'
+    # translation_method = pass_manager_config.translation_method or 'translator'
+    ######################
+    routing_method = 'stochastic'
+    translation_method = 'translator'
+    ######################
     seed_transpiler = pass_manager_config.seed_transpiler
     backend_properties = pass_manager_config.backend_properties
-
-    crosstalk_prop = pass_manager_config.crosstalk_prop or None
 
     # 1. Unroll to 1q or 2q gates
     _unroll3q = Unroll3qOrMore()
