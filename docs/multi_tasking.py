@@ -62,19 +62,6 @@ def multitasking_transpile(multi_circuits: Union[QuantumCircuit, List[QuantumCir
     multi_programming_circuit = list(map(
         _multitasking_transpile, list(zip(multi_circuits, transpile_args))))
 
-    # if layout_method == 'crosstalk':
-    #     # transpile_args = _parse_transpile_args(multi_programming_circuit, backend, basis_gates, coupling_map,
-    #     #                                        backend_properties, initial_layout,
-    #     #                                        layout_method, routing_method, translation_method,
-    #     #                                        seed_transpiler, optimization_level,
-    #     #                                        callback, output_name, crosstalk_prop)
-
-    # list_transpiled_circuits = transpile(
-    #     circuits=multi_programming_circuit,
-    #     backend=backend,
-    #     backend_properties=backend_properties,
-    #     optimization_level=3
-    # )
     if len(multi_programming_circuit) == 1:
         return multi_programming_circuit[0]
     return multi_programming_circuit
@@ -91,9 +78,10 @@ def _multitasking_transpile(circuit_config_tuple: Tuple[List[QuantumCircuit], Di
         pass_manager = multi_tasking_pass_manager(
             pass_manager_config, crosstalk_prop)
 
-    else:
+    elif optimization_level == 3:
         pass_manager = level_3_pass_manager(pass_manager_config)
-
+    else:
+        return circuit
     return pass_manager.run(circuit, callback=transpile_config['callback'],
                             output_name=transpile_config['output_name'])
 
@@ -365,7 +353,35 @@ def _parse_backend_properties(backend_properties, backend, num_circuits):
     # try getting backend_properties from user, else backend
     if backend_properties is None:
         if getattr(backend, 'properties', None):
-            backend_properties = backend.properties().to_dict()
+            backend_properties = backend.properties()
+            if backend_properties and \
+                    (backend_properties.faulty_qubits() or backend_properties.faulty_gates()):
+                faulty_qubits = sorted(
+                    backend_properties.faulty_qubits(), reverse=True)
+                faulty_edges = [
+                    gates.qubits for gates in backend_properties.faulty_gates()]
+                # remove faulty qubits in backend_properties.qubits
+                for faulty_qubit in faulty_qubits:
+                    del backend_properties.qubits[faulty_qubit]
+
+                gates = []
+                for gate in backend_properties.gates:
+                    # remove gates using faulty edges or with faulty qubits (and remap the
+                    # gates in terms of faulty_qubits_map)
+                    faulty_qubits_map = _create_faulty_qubits_map(backend)
+                    if any([faulty_qubits_map[qubits] is not None for qubits in gate.qubits]) or \
+                            gate.qubits in faulty_edges:
+                        continue
+                    gate_dict = gate.to_dict()
+                    replacement_gate = Gate.from_dict(gate_dict)
+                    gate_dict['qubits'] = [faulty_qubits_map[qubit]
+                                           for qubit in gate.qubits]
+                    args = '_'.join([str(qubit)
+                                     for qubit in gate_dict['qubits']])
+                    gate_dict['name'] = "%s%s" % (gate_dict['gate'], args)
+                    gates.append(replacement_gate)
+
+                backend_properties.gates = gates
     if not isinstance(backend_properties, list):
         backend_properties = [backend_properties] * num_circuits
     return backend_properties
