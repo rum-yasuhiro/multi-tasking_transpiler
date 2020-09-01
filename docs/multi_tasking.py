@@ -71,6 +71,7 @@ def _multitasking_transpile(circuit_config_tuple: Tuple[List[QuantumCircuit], Di
     circuits, transpile_config = circuit_config_tuple
     circuit = _compose_multicircuits(circuits, transpile_config)
     pass_manager_config = transpile_config['pass_manager_config']
+    optimization_level = transpile_config['optimization_level']
     crosstalk_prop = transpile_config['crosstalk_prop']
 
     print(crosstalk_prop)
