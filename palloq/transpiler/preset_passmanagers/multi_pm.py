@@ -34,9 +34,7 @@ from qiskit.transpiler.passes import UnitarySynthesis
 from qiskit.transpiler.passes import ApplyLayout
 from qiskit.transpiler.passes import CheckCXDirection
 
-from palloq.transpiler.passes.crosstalk_adaptive_layout import (
-    CrosstalkAdaptiveMultiLayout,
-)
+from palloq.transpiler.passes import CrosstalkAdaptiveMultiLayout
 
 from qiskit.transpiler import TranspilerError
 
