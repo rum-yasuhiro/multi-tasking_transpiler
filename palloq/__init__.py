@@ -1,1 +1,1 @@
-from palloq.compiler import multitasking_transpile
+from multitasking_transpiler import palloq

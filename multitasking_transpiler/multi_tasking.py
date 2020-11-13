@@ -154,8 +154,7 @@ def _compose_dag(dag_list):
 
         Code:
             reg_name_tmp = dag.qubits[0].register.name
-            register_name = reg_name_tmp if (reg_name_tmp not in name_list) and (
-                not reg_name_tmp == 'q') else None
+            register_name = reg_name_tmp if (reg_name_tmp not in name_list) and (not reg_name_tmp == 'q') else None
             name_list.append(register_name)
         """
         # 上記FIXME部分はNoneで対応中: 2020 / 08 / 16
