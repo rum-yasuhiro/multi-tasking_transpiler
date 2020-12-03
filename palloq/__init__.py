@@ -1,1 +1,1 @@
-from multitasking_transpiler import palloq
+from .transpiler.preset_passmanagers.multi_pass_manager import multi_pass_manager

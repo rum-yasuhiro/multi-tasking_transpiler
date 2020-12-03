@@ -13,7 +13,6 @@ def fake_backend():
     return backend_properties
 """
 
-
 class TestMultiTranspile(QiskitTestCase):
     """test multitasking_transpile function"""
 
@@ -25,16 +24,14 @@ class TestMultiTranspile(QiskitTestCase):
         multi_circuit = multitasking_transpile(
             multi_qc_list, backend, optimization_level=3
         )
+        print(multi_circuit)
     
-    def test_xtalkpass_with_non_xtalk:
+    def test_xtalkpass_without_xtalk(self):
         randqc = RandomCircuitGenerator()
         multi_qc_list = randqc.generate(num_multi_circ=1, num_circ=3)
         backend = BasicAer.get_backend("qasm_simulator")
-        
-
-
-
+    
 
 if __name__ == "__main__":
-
-    TestMultiTranspile.test_qiskit_pass_manager()
+    tc = TestMultiTranspile()
+    tc.test_qiskit_pass_manager()

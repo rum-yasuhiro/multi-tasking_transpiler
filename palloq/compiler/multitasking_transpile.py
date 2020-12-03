@@ -50,7 +50,7 @@ def multitasking_transpile(
         output_name: the name of output circuit. str or List[str]
 
     Returns:
-        composed multitasking circuit(s).
+        composed multitasking circuit(s)z.
     """
     multi_circuits = (
         multi_circuits if isinstance(multi_circuits[0], list) else [multi_circuits]

@@ -1,4 +1,4 @@
-from experiments.docs.passes.crosstalk_adaptive_layout import CrosstalkAdaptiveMultiLayout
+from palloq.transpiler.passes.layout.crosstalk_adaptive_layout import CrosstalkAdaptiveMultiLayout
 
 from datetime import datetime, timezone
 import unittest

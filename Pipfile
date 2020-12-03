@@ -1,13 +1,14 @@
 [[source]]
-name = "pypi"
 url = "https://pypi.org/simple"
 verify_ssl = true
-
-[dev-packages]
+name = "pypi"
 
 [packages]
-qiskit = "==0.20.0"
-pydot = "*"
+qiskit = "*"
+
+[dev-packages]
+flake8 = "*"
+pytest = "*"
 
 [requires]
-python_version = "3.7"
+python_version = "3.8"
