@@ -1,1 +1,1 @@
-from .multi_pm import multi_tasking_pass_manager
+from .multi_pm import multi_pass_manager

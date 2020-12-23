@@ -1,1 +1,1 @@
-from .transpiler.preset_passmanagers.multi_pass_manager import multi_pass_manager
+from .transpiler import multi_pass_manager

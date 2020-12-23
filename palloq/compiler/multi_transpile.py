@@ -8,6 +8,7 @@ import warnings
 from time import time
 from typing import List, Union, Dict, Callable, Any, Optional, Tuple
 
+from qiskit.providers.ibmq.ibmqbackend import IBMQSimulator, IBMQBackend
 from qiskit import user_config
 from qiskit.circuit.quantumcircuit import QuantumCircuit, QuantumRegister, ClassicalRegister
 from qiskit.circuit.quantumregister import Qubit
@@ -30,33 +31,34 @@ from qiskit.transpiler.preset_passmanagers import (level_0_pass_manager,
                                                    level_2_pass_manager,
                                                    level_3_pass_manager)
 
-from qiskit.compiler import transpile
-# from palloq.transpiler.preset_passmanagers.multi_pm import multi_tasking_pass_manager
+# from qiskit.compiler import transpile
+from .transpile import transpile
 from palloq import multi_pass_manager
 
+
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 def multi_transpile(circuits: Union[List[QuantumCircuit], List[List[QuantumCircuit]]],
-              backend: Optional[Union[Backend, BaseBackend]] = None,
-              basis_gates: Optional[List[str]] = None,
-              coupling_map: Optional[Union[CouplingMap, List[List[int]]]] = None,
-              backend_properties: Optional[BackendProperties] = None,
-              initial_layout: Optional[Union[Layout, Dict, List]] = None,
-              layout_method: Optional[str] = None,
-              routing_method: Optional[str] = None,
-              translation_method: Optional[str] = None,
-              scheduling_method: Optional[str] = None,
-              instruction_durations: Optional[InstructionDurationsType] = None,
-              dt: Optional[float] = None,
-              seed_transpiler: Optional[int] = None,
-              optimization_level: Optional[int] = None,
-              pass_manager: Optional[PassManager] = None,
-              callback: Optional[Callable[[BasePass, DAGCircuit, float,
-                                           PropertySet, int], Any]] = None,
-              output_name: Optional[Union[str, List[str]]] = None, 
-              crosstalk_prop: Optional[Dict[Tuple[int], Dict[Tuple[int], int]]] = None) -> Union[QuantumCircuit,
-                                                                            List[QuantumCircuit]]:
+                    backend: Optional[Union[Backend, BaseBackend]] = None,
+                    basis_gates: Optional[List[str]] = None,
+                    coupling_map: Optional[Union[CouplingMap, List[List[int]]]] = None,
+                    backend_properties: Optional[BackendProperties] = None,
+                    initial_layout: Optional[Union[Layout, Dict, List]] = None,
+                    layout_method: Optional[str] = None,
+                    routing_method: Optional[str] = None,
+                    translation_method: Optional[str] = None,
+                    scheduling_method: Optional[str] = None,
+                    instruction_durations: Optional[InstructionDurationsType] = None,
+                    dt: Optional[float] = None,
+                    seed_transpiler: Optional[int] = None,
+                    optimization_level: Optional[int] = None,
+                    pass_manager: Optional[PassManager] = None,
+                    callback: Optional[Callable[[BasePass, DAGCircuit, float,
+                                                PropertySet, int], Any]] = None,
+                    output_name: Optional[Union[str, List[str]]] = None, 
+                    xtalk_prop: Optional[Dict[Tuple[int], Dict[Tuple[int], int]]] = None) -> Union[QuantumCircuit,
+                                                                                    List[QuantumCircuit]]:
     """Mapping several circuits to single circuit based on calibration for the backend
 
     Args:
@@ -69,55 +71,61 @@ def multi_transpile(circuits: Union[List[QuantumCircuit], List[List[QuantumCircu
         composed multitasking circuit(s)..
     """
     circuits = circuits if isinstance(circuits[0], list) else [circuits]
-    output_name = output_name if isinstance(output_name, list) else [output_name] * len(circuits)
+    output_name_list = output_name if isinstance(output_name, list) else [output_name] * len(circuits)
+
 
     # combine circuits in parallel
-    multi_circuit_list = list(
-        map(_compose_multicircuits, circuits, output_name)
-    )
+    multi_circuits = list(map(_compose_multicircuits, circuits, output_name_list))
 
-    pass_manager_config = PassManagerConfig(basis_gates,
-                                            coupling_map,
-                                            backend_properties,
-                                            initial_layout,
-                                            layout_method,
-                                            routing_method,
-                                            translation_method,
-                                            scheduling_method,
-                                            instruction_durations,
-                                            seed_transpiler)
+
+    backend_properties = _backend_properties(backend_properties, backend)
+    coupling_map = _coupling_map(coupling_map, backend)
+
+    pass_manager_config = PassManagerConfig(basis_gates=basis_gates,
+                                            coupling_map=coupling_map,
+                                            backend_properties=backend_properties,
+                                            initial_layout= Layout(),
+                                            layout_method=layout_method,
+                                            routing_method=routing_method,
+                                            translation_method=translation_method,
+                                            scheduling_method=scheduling_method,
+                                            instruction_durations=instruction_durations,
+                                            seed_transpiler=seed_transpiler)
 
     # define pass manager
-    if pass_manager: 
+    if pass_manager:
         pass
-    elif crosstalk_prop:
-        pass_manager = multi_pass_manager(pass_manager_config, crosstalk_prop)
-        logger.info("############## xtalk-adaptive multi transpile ##############")
-    elif optimization_level:
-        if optimization_level==0: 
-            pass_manager = level_0_pass_manager(pass_manager_config)
-        elif optimization_level==1: 
-            pass_manager = level_1_pass_manager(pass_manager_config)
-        elif optimization_level==2: 
-            pass_manager = level_2_pass_manager(pass_manager_config)
-        elif optimization_level==3: 
-            pass_manager = level_3_pass_manager(pass_manager_config)
+
+    elif optimization_level and not pass_manager:
         logger.info("############## qiskit transpile optimization level "+str(optimization_level)+" ##############")
+    elif xtalk_prop and layout_method == 'xtalk_adaptive':
+        pass_manager = multi_pass_manager(pass_manager_config, xtalk_prop)
+        layout_method=None
+        logger.info("############## xtalk-adaptive multi transpile ##############")
+        transpiled_multi_circuits = list(map(pass_manager.run, multi_circuits))
+        if len(transpiled_multi_circuits) == 1: 
+            return transpiled_multi_circuits[0]
+        return transpiled_multi_circuits
     else:
         pass_manager = multi_pass_manager(pass_manager_config)
         logger.info("############## multi transpile ##############")
+        
+        transpiled_multi_circuits = list(map(pass_manager.run, multi_circuits))
+        if len(transpiled_multi_circuits) == 1: 
+            return transpiled_multi_circuits[0]
+        return transpiled_multi_circuits
 
     # transpile multi_circuit(s)
-    multi_programming_circuit = transpile(
-                                multi_circuit_list, backend, basis_gates, coupling_map, backend_properties, 
-                                initial_layout, layout_method, routing_method, translation_method, 
-                                scheduling_method, instruction_durations, dt, seed_transpiler, 
-                                optimization_level, pass_manager, callback, output_name, 
-                                )
-
-    if len(multi_programming_circuit) == 1:
-        return multi_programming_circuit[0]
-    return multi_programming_circuit
+    transpied_circuit = transpile(
+                            circuits=multi_circuits, backend=backend, basis_gates=basis_gates, coupling_map=coupling_map, 
+                            backend_properties=backend_properties, initial_layout=initial_layout, 
+                            layout_method=layout_method, routing_method=routing_method, translation_method=translation_method, 
+                            scheduling_method=scheduling_method, instruction_durations=instruction_durations, dt=dt, 
+                            seed_transpiler=seed_transpiler, optimization_level=optimization_level, 
+                            pass_manager=pass_manager, callback=callback, output_name=output_name)
+    if isinstance(transpied_circuit, list) and len(transpied_circuit)==1: 
+        return transpied_circuit[0]
+    return 
 
 
 def _compose_multicircuits(circuits: List[QuantumCircuit], output_name) -> QuantumCircuit:
@@ -181,6 +189,61 @@ def _compose_dag(dag_list):
         qubit_counter += num_qubits
         clbit_counter += num_clbits
     return composed_multidag
+
+def _backend_properties(backend_properties, backend):
+    if backend_properties is None: 
+        if backend: 
+            backend_properties = backend.properties()
+    
+    return backend_properties
+
+
+def _create_faulty_qubits_map(backend):
+    """If the backend has faulty qubits, those should be excluded. A faulty_qubit_map is a map
+       from working qubit in the backend to dumnmy qubits that are consecutive and connected."""
+    faulty_qubits_map = None
+    if backend is not None:
+        if backend.properties():
+            faulty_qubits = backend.properties().faulty_qubits()
+            faulty_edges = [gates.qubits for gates in backend.properties().faulty_gates()]
+        else:
+            faulty_qubits = []
+            faulty_edges = []
+
+        if faulty_qubits or faulty_edges:
+            faulty_qubits_map = {}
+            configuration = backend.configuration()
+            full_coupling_map = configuration.coupling_map
+            functional_cm_list = [edge for edge in full_coupling_map
+                                  if (set(edge).isdisjoint(faulty_qubits) and
+                                      edge not in faulty_edges)]
+
+            connected_working_qubits = CouplingMap(functional_cm_list).largest_connected_component()
+            dummy_qubit_counter = 0
+            for qubit in range(configuration.n_qubits):
+                if qubit in connected_working_qubits:
+                    faulty_qubits_map[qubit] = dummy_qubit_counter
+                    dummy_qubit_counter += 1
+                else:
+                    faulty_qubits_map[qubit] = None
+    return faulty_qubits_map
+
+def _coupling_map(coupling_map, backend):
+    # try getting coupling_map from user, else backend
+    if coupling_map is None:
+        if getattr(backend, 'configuration', None):
+            configuration = backend.configuration()
+            if hasattr(configuration, 'coupling_map') and configuration.coupling_map:
+                faulty_map = _create_faulty_qubits_map(backend)
+                if faulty_map:
+                    coupling_map = CouplingMap()
+                    for qubit1, qubit2 in configuration.coupling_map:
+                        if faulty_map[qubit1] is not None and faulty_map[qubit2] is not None:
+                            coupling_map.add_edge(faulty_map[qubit1], faulty_map[qubit2])
+                else:
+                    coupling_map = CouplingMap(configuration.coupling_map)
+    # coupling_map = [CouplingMap(cm) if isinstance(cm, list) else cm for cm in coupling_map]
+    return coupling_map
 
 if __name__ == "__main__": 
     pass

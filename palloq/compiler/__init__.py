@@ -1,1 +1,1 @@
-from .multitasking_transpile import multitasking_transpile
+from .multi_transpile import multi_transpile
