@@ -31,8 +31,8 @@ from qiskit.transpiler.preset_passmanagers import (level_0_pass_manager,
                                                    level_2_pass_manager,
                                                    level_3_pass_manager)
 
-# from qiskit.compiler import transpile
-from .transpile import transpile
+from qiskit.compiler import transpile
+# from .transpile import transpile
 from palloq import multi_pass_manager
 
 
@@ -57,8 +57,7 @@ def multi_transpile(circuits: Union[List[QuantumCircuit], List[List[QuantumCircu
                     callback: Optional[Callable[[BasePass, DAGCircuit, float,
                                                 PropertySet, int], Any]] = None,
                     output_name: Optional[Union[str, List[str]]] = None, 
-                    xtalk_prop: Optional[Dict[Tuple[int], Dict[Tuple[int], int]]] = None) -> Union[QuantumCircuit,
-                                                                                    List[QuantumCircuit]]:
+                    xtalk_prop: Optional[Dict[Tuple[int], Dict[Tuple[int], int]]] = None):
     """Mapping several circuits to single circuit based on calibration for the backend
 
     Args:
@@ -91,16 +90,15 @@ def multi_transpile(circuits: Union[List[QuantumCircuit], List[List[QuantumCircu
                                             scheduling_method=scheduling_method,
                                             instruction_durations=instruction_durations,
                                             seed_transpiler=seed_transpiler)
-
     # define pass manager
     if pass_manager:
         pass
 
     elif optimization_level and not pass_manager:
         logger.info("############## qiskit transpile optimization level "+str(optimization_level)+" ##############")
-    elif xtalk_prop and layout_method == 'xtalk_adaptive':
+    elif layout_method == 'xtalk_adaptive':
         pass_manager = multi_pass_manager(pass_manager_config, xtalk_prop)
-        layout_method=None
+        # layout_method=None
         logger.info("############## xtalk-adaptive multi transpile ##############")
         transpiled_multi_circuits = list(map(pass_manager.run, multi_circuits))
         if len(transpiled_multi_circuits) == 1: 
@@ -125,7 +123,7 @@ def multi_transpile(circuits: Union[List[QuantumCircuit], List[List[QuantumCircu
                             pass_manager=pass_manager, callback=callback, output_name=output_name)
     if isinstance(transpied_circuit, list) and len(transpied_circuit)==1: 
         return transpied_circuit[0]
-    return 
+    return transpied_circuit
 
 
 def _compose_multicircuits(circuits: List[QuantumCircuit], output_name) -> QuantumCircuit:
@@ -140,7 +138,7 @@ def _compose_multicircuits(circuits: List[QuantumCircuit], output_name) -> Quant
     composed_multicircuit = QuantumCircuit(name=output_name)
     name_list = []
     bit_counter = 0
-    dag_list = [circuit_to_dag(circuit) for circuit in circuits]
+    dag_list = [circuit_to_dag(circuit.copy()) for circuit in circuits]
     return dag_to_circuit(_compose_dag(dag_list))
 
 
@@ -148,8 +146,9 @@ def _compose_dag(dag_list):
     """Compose each dag and return new multitask dag"""
 
     """FIXME 下記と同様
-    # name_list = []
     """
+    name_list = []
+    #################
     qubit_counter = 0
     clbit_counter = 0
     composed_multidag = DAGCircuit()
@@ -169,16 +168,18 @@ def _compose_dag(dag_list):
                 not reg_name_tmp == 'q') else None
             name_list.append(register_name)
         """
-        # 上記FIXME部分はNoneで対応中: 2020 / 08 / 16
-        register_name = None
-        ########################
+        ############################################################
+        reg_name_tmp = dag.qubits[0].register.name
+        register_name = reg_name_tmp if (reg_name_tmp not in name_list) and (not reg_name_tmp == 'q') else None
+        name_list.append(register_name)
+        ############################################################
 
         qr = QuantumRegister(size=num_qubits, name=register_name)
         composed_multidag.add_qreg(qr)
         qubits = composed_multidag.qubits[qubit_counter : qubit_counter + num_qubits]
 
         if num_clbits > 0: 
-            cr = ClassicalRegister(size=num_clbits, name=register_name)
+            cr = ClassicalRegister(size=num_clbits, name=None)
             composed_multidag.add_creg(cr)
             clbits = composed_multidag.clbits[clbit_counter : clbit_counter + num_clbits]
 
